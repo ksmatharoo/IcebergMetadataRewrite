@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<property>
+    <name>hive.metastore.uris</name>
+    <value>thrift://172.19.0.5:9083</value>
+    <description>If true, the metastore thrift interface will be secured with SASL.
+        Clients must authenticate with Kerberos.</description>
+</property>
+</configuration>

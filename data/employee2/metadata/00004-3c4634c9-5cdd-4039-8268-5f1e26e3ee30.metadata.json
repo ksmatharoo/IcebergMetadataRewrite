@@ -1,0 +1,190 @@
+{
+  "format-version" : 2,
+  "table-uuid" : "ddd46ee3-2bef-44db-aa13-fb1357a4399d",
+  "location" : "/home/ksingh/ksingh/IcebergTest/data/employee2",
+  "last-sequence-number" : 3,
+  "last-updated-ms" : 1675740126513,
+  "last-column-id" : 11,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "EMPLOYEE_ID",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "FIRST_NAME",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 3,
+      "name" : "LAST_NAME",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 4,
+      "name" : "EMAIL",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 5,
+      "name" : "PHONE_NUMBER",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 6,
+      "name" : "HIRE_DATE",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 7,
+      "name" : "JOB_ID",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 8,
+      "name" : "SALARY",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 9,
+      "name" : "COMMISSION_PCT",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 10,
+      "name" : "MANAGER_ID",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 11,
+      "name" : "DEPARTMENT_ID",
+      "required" : false,
+      "type" : "int"
+    } ]
+  } ],
+  "default-spec-id" : 1,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ {
+      "name" : "HIRE_DATE_month",
+      "transform" : "month",
+      "source-id" : 6,
+      "field-id" : 1000
+    } ]
+  }, {
+    "spec-id" : 1,
+    "fields" : [ {
+      "name" : "HIRE_DATE_year",
+      "transform" : "year",
+      "source-id" : 6,
+      "field-id" : 1001
+    } ]
+  } ],
+  "last-partition-id" : 1001,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : { },
+  "current-snapshot-id" : 5019969040157511702,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 5019969040157511702,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "sequence-number" : 1,
+    "snapshot-id" : 6323869729965593532,
+    "timestamp-ms" : 1675738613328,
+    "summary" : {
+      "operation" : "append",
+      "spark.app.id" : "local-1675738605460",
+      "added-data-files" : "37",
+      "added-records" : "50",
+      "added-files-size" : "116703",
+      "changed-partition-count" : "37",
+      "total-records" : "50",
+      "total-files-size" : "116703",
+      "total-data-files" : "37",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/home/ksingh/ksingh/IcebergTest/data/employee2/metadata/snap-6323869729965593532-1-f7db5e09-8791-47a5-87ea-2236cf0168b8.avro",
+    "schema-id" : 0
+  }, {
+    "sequence-number" : 2,
+    "snapshot-id" : 3746261504775146606,
+    "parent-snapshot-id" : 6323869729965593532,
+    "timestamp-ms" : 1675738761779,
+    "summary" : {
+      "operation" : "append",
+      "spark.app.id" : "local-1675738753488",
+      "added-data-files" : "37",
+      "added-records" : "50",
+      "added-files-size" : "116703",
+      "changed-partition-count" : "37",
+      "total-records" : "100",
+      "total-files-size" : "233406",
+      "total-data-files" : "74",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/home/ksingh/ksingh/IcebergTest/data/employee2/metadata/snap-3746261504775146606-1-674ec962-e36c-47df-9c47-c13dcdc9ce7b.avro",
+    "schema-id" : 0
+  }, {
+    "sequence-number" : 3,
+    "snapshot-id" : 5019969040157511702,
+    "parent-snapshot-id" : 3746261504775146606,
+    "timestamp-ms" : 1675740126513,
+    "summary" : {
+      "operation" : "replace",
+      "added-data-files" : "8",
+      "deleted-data-files" : "74",
+      "added-records" : "100",
+      "deleted-records" : "100",
+      "added-files-size" : "31547",
+      "removed-files-size" : "233406",
+      "changed-partition-count" : "45",
+      "total-records" : "100",
+      "total-files-size" : "31547",
+      "total-data-files" : "8",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/home/ksingh/ksingh/IcebergTest/data/employee2/metadata/snap-5019969040157511702-1-48ee583b-87e2-456a-bb23-a447d35cab0e.avro",
+    "schema-id" : 0
+  } ],
+  "statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1675738613328,
+    "snapshot-id" : 6323869729965593532
+  }, {
+    "timestamp-ms" : 1675738761779,
+    "snapshot-id" : 3746261504775146606
+  }, {
+    "timestamp-ms" : 1675740126513,
+    "snapshot-id" : 5019969040157511702
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1675738611126,
+    "metadata-file" : "/home/ksingh/ksingh/IcebergTest/data/employee2/metadata/00000-5df750cf-7008-497e-8aff-a97842f24160.metadata.json"
+  }, {
+    "timestamp-ms" : 1675738613328,
+    "metadata-file" : "/home/ksingh/ksingh/IcebergTest/data/employee2/metadata/00001-181cf15d-56a3-4ecb-a41a-562122779230.metadata.json"
+  }, {
+    "timestamp-ms" : 1675738761779,
+    "metadata-file" : "/home/ksingh/ksingh/IcebergTest/data/employee2/metadata/00002-bb88e8b8-695b-4787-bd1e-4f10a21092e3.metadata.json"
+  }, {
+    "timestamp-ms" : 1675738864453,
+    "metadata-file" : "/home/ksingh/ksingh/IcebergTest/data/employee2/metadata/00003-4a144e29-ca45-4175-9f71-2185d0999e0e.metadata.json"
+  } ]
+}
