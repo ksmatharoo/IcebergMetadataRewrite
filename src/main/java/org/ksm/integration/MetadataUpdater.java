@@ -192,15 +192,30 @@ public class MetadataUpdater {
             String.format("%s/metadata/",targetPrefixPath) :
                 String.format("%s/metadata_%s/", targetPrefixPath, targetEnvName);
         return path;
+    }
+
+    private String getFinalMetadataTargetPath() {
+
+        String path  = writeToOrigMetadataDir ?
+                String.format("%s/metadata/",targetPrefixPath) :
+                String.format("%s/metadata_%s/", targetPrefixPath, targetEnvName);
+        return path;
 
     }
 
+    private String getFinalMetadataSourcePath() {
+
+        String path = String.format("%s/metadata/",targetPrefixPath) ;
+        return path;
+
+    }
     private void updateMetadataJson(String[] jsonPaths) {
 
         for (String jsonPath : jsonPaths) {
             String fileName = fileName(jsonPath);
             TableMetadata tableMetadata = TableMetadataParser.read(fileIO, jsonPath);
-            TableMetadata updated = TableMetadataUtil.replacePaths(tableMetadata, sourcePrefixToReplace, targetPrefixPath, fileIO);
+            TableMetadata updated = TableMetadataUtil.replacePaths(tableMetadata, getFinalMetadataSourcePath(),
+                    getFinalMetadataTargetPath(), fileIO);
 
             TableMetadataParser.overwrite(updated, fileIO.newOutputFile(getOutputDir() + fileName));
 
@@ -246,7 +261,8 @@ public class MetadataUpdater {
                     }
                     ManifestFile newFile = manifestFileObj.copy();
                     if (newFile.path().startsWith(sourcePrefixToReplace)) {
-                        ((StructLike) newFile).set(0, newPath(newFile.path(), sourcePrefixToReplace, targetPrefixPath));
+                        ((StructLike) newFile).set(0, newPath(newFile.path(),
+                                getFinalMetadataSourcePath(), getFinalMetadataTargetPath()));
                     }
                     writer.add(newFile);
                 }
