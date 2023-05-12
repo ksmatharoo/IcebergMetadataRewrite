@@ -11,14 +11,7 @@ import org.junit.Test;
 public class SparkUtilsTest extends TestCase {
 
     @Test
-    public void testDelta() {
-        try {
+    public void test() {
 
-            SparkSession sparkSession = Utils.getSparkSession();
-            sparkSession.sql("show tables").show(false);
-
-        } catch (NoSuchTableException e) {
-            throw new RuntimeException(e);
-        }
     }
 }

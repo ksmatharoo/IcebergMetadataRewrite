@@ -1,12 +1,10 @@
 # IcebergMetadataRewrite
 
-this project require hive running on local machine,you can start hive with docker image 
-in hiveDocker directory.
-
-Project will rewrite iceberg metadata, it will accept the table base and update it to all metadata file.  
+This project require hive running on local machine,you can start hive with docker image 
+in hiveDocker directory. Project will rewrite iceberg metadata, it will accept the table base and update it to all metadata file.  
 
 # Problem 
-Suppose you copied an iceberg data and metadata directory from another cluster or move the table 
+Suppose you copied an iceberg table(data and metadata directory) from another cluster or move the table 
 to another location by copying the directories, this will result in un-readable table.
 
 # Solution
@@ -25,5 +23,3 @@ main will do following.
 1. create an iceberg table from spark data frame.
 2. rewrite metadata folder to metadata_<env> folder
 3. register table with latest snapshot metadata_<env>/<uuid>.json
-
-
