@@ -8,7 +8,6 @@ import org.apache.spark.api.java.function.MapPartitionsFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
-import org.ksm.integration.ManifestListHelper;
 import org.ksm.integration.MetadataUpdater;
 
 import java.util.HashMap;

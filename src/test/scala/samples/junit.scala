@@ -1,8 +1,8 @@
 
 package samples
 
+import org.junit.Assert._
 import org.junit._
-import Assert._
 
 @Test
 class AppTest {

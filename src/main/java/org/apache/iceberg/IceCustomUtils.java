@@ -1,14 +1,17 @@
 package org.apache.iceberg;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.iceberg.io.*;
+import org.apache.iceberg.io.ContentCache;
+import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.InputFile;
+import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
-
 
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.iceberg.ManifestFiles.*;
+import static org.apache.iceberg.ManifestFiles.cachingEnabled;
+import static org.apache.iceberg.ManifestFiles.contentCache;
 
 @Slf4j
 public class IceCustomUtils {

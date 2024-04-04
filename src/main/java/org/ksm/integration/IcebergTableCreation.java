@@ -10,7 +10,6 @@ import org.apache.iceberg.spark.SparkSchemaUtil;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

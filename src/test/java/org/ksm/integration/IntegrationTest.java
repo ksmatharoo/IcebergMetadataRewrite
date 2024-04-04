@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogProperties;
-import org.apache.iceberg.CustomFileIO;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.hive.HiveCatalog;
@@ -35,15 +34,15 @@ public class IntegrationTest {
         properties.put("warehouse", wareHousePath);
         properties.put(CatalogProperties.URI, thriftURl);
         properties.put(CatalogProperties.CATALOG_IMPL, HiveCatalog.class.getName());
-        properties.put(CatalogProperties.FILE_IO_IMPL, CustomFileIO.class.getName());
 
         HiveCatalog hiveCatalog = new HiveCatalog();
         hiveCatalog.setConf(spark.sparkContext().hadoopConfiguration());
         hiveCatalog.initialize("hive", properties);
 
         String dbName = "default";
-        String tableName = "testTable3"; //+ System.currentTimeMillis();
+        String tableName = "test_table"; //+ System.currentTimeMillis();
         String env = "aws";
+        String tableLocation = wareHousePath + "/" + tableName;
         TableIdentifier tableIdentifier = TableIdentifier.of(dbName, tableName);
         String newTableName = String.format("%s_%s", tableName, env);
         TableIdentifier newTableIdentifier = TableIdentifier.of(dbName, newTableName);
@@ -53,6 +52,7 @@ public class IntegrationTest {
             spark.sql("drop table if exists " + tableIdentifier).collect();
             tab = newTableIdentifier.toString();
             spark.sql("drop table if exists " + newTableIdentifier).collect();
+            Utils.deleteDirectory(spark, tableLocation);
         } catch (Exception e) {
             log.warn("table drop for table name :{} got exception : ", tab, e);
         }
@@ -89,7 +89,6 @@ public class IntegrationTest {
                 collectAsList().get(0).getLong(0);
 
         Assert.assertTrue(newTableCount == origRowCount);
-
         log.info("end");
     }
 }

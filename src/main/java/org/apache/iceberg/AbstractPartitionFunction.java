@@ -76,6 +76,4 @@ public class AbstractPartitionFunction implements Serializable {
                 CatalogUtil.loadFileIO(fileIOImpl, properties, conf);
         return fileIO;
     }
-
-
 }

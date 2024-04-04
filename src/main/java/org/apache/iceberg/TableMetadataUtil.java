@@ -1,14 +1,14 @@
 package org.apache.iceberg;
 
-import java.util.List;
-import java.util.Map;
-
 import lombok.extern.slf4j.Slf4j;
 import org.apache.iceberg.TableMetadata.MetadataLogEntry;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.util.SerializableSupplier;
+
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 public class TableMetadataUtil {
