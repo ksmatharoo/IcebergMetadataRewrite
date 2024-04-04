@@ -16,16 +16,18 @@ import java.util.Map;
 @Slf4j
 public class Application {
 
-    public static void main(String[] args) throws NoSuchTableException {
+    public static void main(String[] args) throws Exception {
 
-        SparkSession spark = Utils.getSparkSession();
-
-        Map<String, String> properties = new HashMap<String, String>();
         String userDirectory = System.getProperty("user.dir");
         String dir = "/data";
         String wareHousePath = userDirectory + dir;
+        String thriftURl = "thrift://172.18.0.5:9083";
+
+        SparkSession spark = Utils.getSparkSession(wareHousePath, thriftURl);
+
+        Map<String, String> properties = new HashMap<String, String>();
         properties.put("warehouse", wareHousePath);
-        properties.put("uri", "thrift://172.19.0.5:9083");
+        properties.put("uri", "thrift://172.18.0.5:9083");
 
 
         HiveCatalog hiveCatalog = new HiveCatalog();
@@ -55,7 +57,7 @@ public class Application {
                 withTargetEnvName("aws").
                 build();
 
-        updater.updateBasePathInMetadata();
+        updater.updateBasePathInMetadata(spark, hiveCatalog, tableIdentifier, false);
 
         // register updated metadata.json
         //hiveCatalog.registerTable(TableIdentifier.of("default","testTable_aws1"),"<metadata path>.json");

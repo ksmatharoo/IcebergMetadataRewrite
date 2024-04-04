@@ -38,7 +38,7 @@ public class IceCustomUtils {
                 writer.add(dataFile);
                 break;
             case EXISTING:
-                writer.existing(dataFile, entry.snapshotId(), entry.sequenceNumber());
+                writer.existing(dataFile, entry.snapshotId(), entry.dataSequenceNumber(), entry.fileSequenceNumber());
                 break;
             case DELETED:
                 writer.delete(dataFile, entry.dataSequenceNumber(), entry.fileSequenceNumber());
@@ -81,6 +81,70 @@ public class IceCustomUtils {
             return cache.tryCache(io, path, length);
         } else {
             return io.newInputFile(path, length);
+        }
+    }
+
+
+    public static ManifestReader<DeleteFile> readDeleteManifestReader(ManifestFile manifest, String path,
+                                                                      FileIO io,
+                                                                      Map<Integer, PartitionSpec> specsById) {
+
+        //log. info("ManifestContent. DELETES ()", manifest);
+        Preconditions.checkArgument(manifest.content() == ManifestContent.DELETES,
+                "Cannot read a delete manifest with a ManifestReader: %s", manifest);
+        InputFile file = newInputFile(io, path, manifest.length());
+        InheritableMetadata inheritableMetadata = InheritableMetadataFactory.fromManifest(manifest);
+        ManifestReader manifestReader = new ManifestReader(file, manifest.partitionSpecId(),
+                specsById, inheritableMetadata, ManifestReader.FileType.DELETE_FILES);
+        return manifestReader;
+    }
+
+
+    public static void updateDeleteManifest(ManifestReader<DeleteFile> manifestReader,
+                                            ManifestWriter<DeleteFile> writer,
+                                            PartitionSpec spec, String sourcePrefix, String targetPrefix) {
+        manifestReader.entries().forEach(
+                entry -> appendDeleteEntry(entry, writer, spec, sourcePrefix, targetPrefix));
+    }
+
+    public static void appendDeleteEntry(ManifestEntry<DeleteFile> entry, ManifestWriter<DeleteFile> writer,
+                                         PartitionSpec spec, String sourcePrefix, String targetPrefix) {
+        DeleteFile deleteFile = entry.file();
+        DeleteFile updateDeleteFile = null;
+        String dataFilePath = deleteFile.path().toString();
+        if (dataFilePath.startsWith(sourcePrefix)) {
+            dataFilePath = TableMetadataUtil.newPath(dataFilePath, sourcePrefix, targetPrefix);
+            List<Integer> equalityFieldIds = deleteFile.equalityFieldIds();
+            int[] deleteFileEqualityFieldIds = null;
+            if (equalityFieldIds != null) {
+                deleteFileEqualityFieldIds = new int[equalityFieldIds.size()];
+                for (int i = 0; i < equalityFieldIds.size(); i++) {
+                    deleteFileEqualityFieldIds[i] = equalityFieldIds.get(i);
+                }
+            }
+            Metrics metrics = new Metrics(deleteFile.recordCount(), deleteFile.columnSizes(), deleteFile.valueCounts(),
+                    deleteFile.nullValueCounts(), deleteFile.nanValueCounts());
+
+            updateDeleteFile = new GenericDeleteFile(deleteFile.specId(),
+                    deleteFile.content(), dataFilePath, deleteFile.format(),
+                    (PartitionData) deleteFile.partition(), deleteFile.fileSizeInBytes(),
+                    metrics, deleteFileEqualityFieldIds,
+                    deleteFile.sortOrderId(),
+                    deleteFile.keyMetadata());
+            DeleteFile updateDeleteFile1 = updateDeleteFile == null ? deleteFile : updateDeleteFile;
+            log.info("deleteFile :(}", deleteFile);
+            log.info("updateDeleteFile1 : (}", updateDeleteFile1);
+            switch (entry.status()) {
+                case ADDED:
+                    writer.add(updateDeleteFile1);
+                    break;
+                case EXISTING:
+                    writer.existing(updateDeleteFile1, entry.snapshotId(), entry.dataSequenceNumber(), entry.fileSequenceNumber());
+                    break;
+                case DELETED:
+                    writer.delete(updateDeleteFile1, entry.dataSequenceNumber(), entry.fileSequenceNumber());
+                    break;
+            }
         }
     }
 

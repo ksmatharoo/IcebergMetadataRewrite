@@ -13,10 +13,10 @@ import java.util.stream.Collectors;
 
 public class Utils {
 
-    public static SparkSession getSparkSession()  {
+    public static SparkSession getSparkSession(String wareHousePath, String thriftURL) {
 
-        String userDirectory = System.getProperty("user.dir");
-        String wareHousePath = userDirectory + "/data";
+        //String userDirectory = System.getProperty("user.dir");
+        //String wareHousePath = userDirectory + "/data";
         SparkSession sparkSession = SparkSession.builder()
                 .appName("IcebergTest")
                 .master("local[1]")
@@ -25,7 +25,7 @@ public class Utils {
                 .config("spark.sql.catalog.spark_catalog.type", "hive")
                 //.config("spark.sql.catalog.spark_catalog.io-impl", "org.apache.iceberg.hadoop.CustomHadoopFileIO")
                 .config("spark.sql.warehouse.dir", wareHousePath)
-                .config("spark.hive.metastore.uris", "thrift://172.19.0.5:9083")
+                .config("spark.hive.metastore.uris", thriftURL)
                 .enableHiveSupport()
                 .getOrCreate();
 
@@ -34,8 +34,8 @@ public class Utils {
 
     /**
      * all column names converted to lower case
-     * **/
-    public static Dataset<Row> readCSVFileWithoutDate(SparkSession spark, String path){
+     **/
+    public static Dataset<Row> readCSVFileWithoutDate(SparkSession spark, String path) {
 
         path = StringUtils.isEmpty(path) ? "src/main/resources/employee.csv" : path;
 

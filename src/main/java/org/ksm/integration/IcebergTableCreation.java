@@ -25,7 +25,7 @@ public class IcebergTableCreation {
     }
 
     public Table createTable(Schema schema, List<String> partitionColumns, TableIdentifier identifier,
-                               String baseLocation ) {
+                             String baseLocation) {
 
         if (!hiveCatalog.tableExists(identifier)) {
 
@@ -35,21 +35,21 @@ public class IcebergTableCreation {
             tableProperties.put("format-version", "2");
 
             PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
-            partitionColumns.forEach(field -> builder.identity(field) );
+            partitionColumns.forEach(field -> builder.identity(field));
             PartitionSpec spec = builder.build();
 
             Table table = hiveCatalog.createTable(identifier, schema, spec, location, tableProperties);
             log.info("table :{} created at : {}", identifier, table.location());
             return table;
         } else {
-            Table table =  hiveCatalog.loadTable(identifier);
+            Table table = hiveCatalog.loadTable(identifier);
             log.info("table :{} already exists, at : {}", identifier, table.location());
             return table;
         }
     }
 
     public Table createTableFromDataset(Dataset<Row> input, List<String> partitionColumns, TableIdentifier identifier,
-                             String baseLocation ) {
+                                        String baseLocation) {
         if (!hiveCatalog.tableExists(identifier)) {
 
             Schema schema = SparkSchemaUtil.convert(input.schema());
@@ -61,14 +61,14 @@ public class IcebergTableCreation {
 
             PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
 
-            partitionColumns.forEach(field -> builder.identity(field) );
+            partitionColumns.forEach(field -> builder.identity(field));
             PartitionSpec spec = builder.build();
 
             Table table = hiveCatalog.createTable(identifier, schema, spec, location, tableProperties);
             log.info("table :{} created at : {}", identifier, table.location());
             return table;
         } else {
-            Table table =  hiveCatalog.loadTable(identifier);
+            Table table = hiveCatalog.loadTable(identifier);
             log.info("table :{} already exists, at : {}", identifier, table.location());
             return table;
         }

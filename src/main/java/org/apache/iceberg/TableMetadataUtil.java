@@ -8,6 +8,7 @@ import org.apache.iceberg.TableMetadata.MetadataLogEntry;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
+import org.apache.iceberg.util.SerializableSupplier;
 
 @Slf4j
 public class TableMetadataUtil {
@@ -24,12 +25,24 @@ public class TableMetadataUtil {
         long snapshotId = metadata.currentSnapshot() == null ? -1 : metadata.currentSnapshot().snapshotId();
         Map<String, String> properties = updateProperties(metadata.properties(), sourcePrefix, targetPrefix);
 
-        return new TableMetadata(null, metadata.formatVersion(), metadata.uuid(),
-                newLocation, metadata.lastSequenceNumber(), metadata.lastUpdatedMillis(), metadata.lastColumnId(),
-                metadata.currentSchemaId(), metadata.schemas(), metadata.defaultSpecId(), metadata.specs(),
-                metadata.lastAssignedPartitionId(), metadata.defaultSortOrderId(), metadata.sortOrders(),
-                properties, snapshotId, newSnapshots, metadata.snapshotLog(), metadataLogEntries, metadata.refs(),
-                metadata.statisticsFiles(),metadata.changes());
+        SerializableSupplier<List<Snapshot>> newSnapshotSupplier = new SerializableSupplier<List<Snapshot>>() {
+            @Override
+            public List<Snapshot> get() {
+                return Lists.newArrayList(newSnapshots);
+            }
+        };
+
+        return new TableMetadata(metadata.location(), metadata.formatVersion(), metadata.uuid(),
+                newLocation, metadata.lastSequenceNumber(), metadata.lastUpdatedMillis(),
+                metadata.lastColumnId(),
+                metadata.currentSchemaId(), metadata.schemas(), metadata.defaultSpecId(),
+                metadata.specs(),
+                metadata.lastAssignedPartitionId(), metadata.defaultSortOrderId(),
+                metadata.sortOrders(),
+                properties, snapshotId, newSnapshots,
+                newSnapshotSupplier,
+                metadata.snapshotLog(), metadataLogEntries, metadata.refs(),
+                metadata.statisticsFiles(), metadata.changes());
     }
 
     private static Map<String, String> updateProperties(Map<String, String> tableProperties,
@@ -78,7 +91,7 @@ public class TableMetadataUtil {
         return newSnapshots;
     }
 
-     static String newPath(String path, String sourcePrefix, String targetPrefix) {
+    static String newPath(String path, String sourcePrefix, String targetPrefix) {
         return path.replaceFirst(sourcePrefix, targetPrefix);
     }
 }

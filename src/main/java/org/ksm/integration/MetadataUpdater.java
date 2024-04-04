@@ -1,6 +1,7 @@
 package org.ksm.integration;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
@@ -8,18 +9,31 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.iceberg.*;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.hadoop.HadoopFileIO;
+import org.apache.iceberg.hadoop.SerializableConfiguration;
+import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.util.LocationUtil;
+import org.apache.iceberg.util.Pair;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.net.URISyntaxException;
+
 import java.util.*;
+import java.util.stream.Collectors;
+
+import org.apache.spark.broadcast.Broadcast;
+import org.apache.spark.sql.*;
+import org.apache.spark.sql.catalyst.encoders.RowEncoder;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import scala.reflect.ClassManifestFactory;
 
 @Slf4j
 public class MetadataUpdater {
@@ -49,7 +63,7 @@ public class MetadataUpdater {
 
     /**
      * if source and target are different dir then setting this flag can write data in metadata dir
-     * **/
+     **/
     boolean writeToOrigMetadataDir;
 
     FileIO fileIO;
@@ -76,10 +90,10 @@ public class MetadataUpdater {
             this.targetPrefixPath = builder.targetBasePath;
         }
         if (builder.writeToOrigMetadataDir) {
-            if(sourceBasePath.equalsIgnoreCase(targetPrefixPath)){
+            if (sourceBasePath.equalsIgnoreCase(targetPrefixPath)) {
                 this.writeToOrigMetadataDir = false;
                 log.warn("sourceBasePath :{} and  targetPrefixPath : {} path are same metadata can't overwrite original " +
-                        "files ",sourceBasePath, targetPrefixPath);
+                        "files ", sourceBasePath, targetPrefixPath);
             } else {
                 this.writeToOrigMetadataDir = true;
             }
@@ -123,15 +137,178 @@ public class MetadataUpdater {
         }
     }
 
-    public void updateBasePathInMetadata() {
+    public void updateBasePathInMetadata(SparkSession session, HiveCatalog hiveCatalog, TableIdentifier tableIdentifier, boolean useS3Listing)
+            throws Exception {
+        try {
+            Set<String> metadataPaths = new HashSet<>();
+            Set<String> manifestListPaths = new HashSet<>();
+            Set<String> manifestPaths = new HashSet<>();
 
+            Pair<List<String>, List<String>> metadataFileNames;
+            if (useS3Listing) {
+                metadataFileNames = getMetadataFileNamesUsingS3Listing(manifestPaths);
+            } else {
+                metadataFileNames = getMetadataFileNames(hiveCatalog,
+                        tableIdentifier);
+            }
+            metadataPaths.addAll(metadataFileNames.first());
+            manifestListPaths.addAll(metadataFileNames.second());
+
+            sourcePrefixToReplace = getSourcePrefixToReplace(metadataPaths.toArray(new String[0]));
+            log.info("sourcePrefixToReplace: {} will be replaced with: {}", sourcePrefixToReplace, targetPrefixPath);
+            updateMetadataJson(metadataPaths.toArray(new String[0]));
+            updateManifestList(manifestListPaths.toArray(new String[0]));
+            updateManifestFiles(manifestPaths.toArray(new String[0]));
+
+        } catch (Exception e) {
+            log.error("exception caught : ", e);
+            throw e;
+        }
+    }
+
+    public void updateBasePathInMetadataSpark(SparkSession session, HiveCatalog hiveCatalog,
+                                              TableIdentifier tableIdentifier, boolean useS3Listing) throws Exception {
+        try {
+            useS3Listing = false;
+            String userMetadataDir = "metadata";
+            // todo
+            String metadataOutputPath = this.sourceBasePath;
+
+
+            Set<String> metadataPaths = new HashSet<>();
+            Set<String> manifestListPaths = new HashSet<>();
+            Set<String> manifestPaths = new HashSet<>();
+
+            Pair<List<String>, List<String>> metadataFileNames;
+            if (useS3Listing) {
+                metadataFileNames = getMetadataFileNamesUsingS3Listing(manifestPaths);
+            } else {
+                metadataFileNames = getMetadataFileNames(hiveCatalog,
+                        tableIdentifier);
+            }
+            metadataPaths.addAll(metadataFileNames.first());
+            manifestListPaths.addAll(metadataFileNames.second());
+
+            sourcePrefixToReplace = getSourcePrefixToReplace(metadataPaths.toArray(new String[0]));
+            log.info("sourcePrefixToReplace: {} will be replaced with: {}", sourcePrefixToReplace, targetPrefixPath);
+            /*updateMetadataJson(metadataPaths.toArray(new String[0]));
+            updateManifestList(manifestListPaths.toArray(new String[0]));
+            updateManifestFiles(manifestPaths.toArray(new String[0]));*/
+
+            List<String> metadataJsonList = metadataFileNames.first();
+            List<String> manifestList = metadataFileNames.second();
+            Dataset<String> datasetOfMetadataJson = session.createDataset(metadataJsonList, Encoders.STRING());
+            StructType outSchema = DataTypes.createStructType(new StructField[]{
+                    DataTypes.createStructField("path", DataTypes.StringType, false),
+                    DataTypes.createStructField("snapshots", DataTypes.BinaryType, false),
+                    DataTypes.createStructField("partSpec", DataTypes.BinaryType, false)
+            });
+            Configuration conf = session.sparkContext().hadoopConfiguration();
+            Broadcast<SerializableConfiguration> serConf = session.sparkContext().broadcast(new SerializableConfiguration(conf),
+                    ClassManifestFactory.fromClass(SerializableConfiguration.class));
+
+            HashMap<String, String> properties = new HashMap<>();
+            properties.putAll(fileIO.properties());
+
+            Dataset<Row> rowDataset = datasetOfMetadataJson.repartition(metadataJsonList.size()).
+                    mapPartitions(
+                            new MetadataJsonPartitionFunction(serConf,
+                                    this.sourcePrefixToReplace,
+                                    this.targetPrefixPath,
+                                    metadataOutputPath,
+                                    this.writeToOrigMetadataDir,
+                                    this.targetEnvName,
+                                    userMetadataDir,
+                                    properties),
+                            RowEncoder.apply(outSchema));
+            List<Row> collectedRows = rowDataset.collectAsList();
+
+            HashMap<String, SnapshotInfo> snapshotInfo = new HashMap<>();
+            HashMap<Integer, PartitionSpec> integerPartitionSpec = new HashMap<>();
+            for (Row row : collectedRows) {
+                byte[] out1 = (byte[]) row.get(1);
+                byte[] out2 = (byte[]) row.get(2);
+                snapshotInfo.putAll(
+                        (HashMap<String, SnapshotInfo>) SerializationUtils.deserialize(out1));
+                integerPartitionSpec.putAll(
+                        (HashMap<Integer, PartitionSpec>) SerializationUtils.deserialize(out2));
+            }
+
+            int formatVersion = getFormatVersion(snapshotInfo);
+            Dataset<String> manifestListPathDf = session.createDataset(manifestList, Encoders.STRING());
+            StructType outSchemaPaths = DataTypes.createStructType(new StructField[]{
+                    DataTypes.createStructField("path", DataTypes.StringType, false),
+                    DataTypes.createStructField("manifest", DataTypes.BinaryType, false)
+            });
+            Dataset<Row> updatedManifestListDf = manifestListPathDf.repartition(manifestList.size()).
+                    mapPartitions(new ManifestListPartitionFunction(serConf,
+                                    this.sourcePrefixToReplace,
+                                    this.targetPrefixPath,
+                                    metadataOutputPath,
+                                    this.writeToOrigMetadataDir,
+                                    this.targetEnvName,
+                                    userMetadataDir,
+                                    properties,
+                                    snapshotInfo,
+                                    formatVersion)
+                            , RowEncoder.apply(outSchemaPaths));
+
+            List<Row> updatedManifestList = updatedManifestListDf.collectAsList();
+
+            HashMap<String, ManifestFile> manifestFileMap = new HashMap();
+            for (Row row : updatedManifestList) {
+                byte[] out1 = (byte[]) row.get(1);
+                HashMap<String, ManifestFile> deserialize = (HashMap<String, ManifestFile>) SerializationUtils.deserialize(out1);
+                manifestFileMap.putAll(deserialize);
+            }
+            List<ManifestFile> manifestFileList = manifestFileMap.values().stream().collect(Collectors.toList());
+            StructType manifestFileOutSchema = DataTypes.createStructType(new StructField[]{
+                    DataTypes.createStructField("manifest", DataTypes.StringType, false),
+            });
+            Encoder<ManifestFile> manifestEncoder = Encoders.javaSerialization(ManifestFile.class);
+            Dataset<ManifestFile> manifestFileDataset = session.createDataset(manifestFileList, manifestEncoder);
+
+            Dataset<Row> manifestWriteOutPut = manifestFileDataset.repartition(manifestFileList.size())
+                    .mapPartitions(new ManifestPartitionFunction(serConf,
+                                    this.sourcePrefixToReplace,
+                                    this.targetPrefixPath,
+                                    metadataOutputPath,
+                                    this.writeToOrigMetadataDir,
+                                    this.targetEnvName,
+                                    userMetadataDir,
+                                    properties,
+                                    formatVersion, integerPartitionSpec),
+                            RowEncoder.apply(manifestFileOutSchema));
+            List<Row> collected = manifestWriteOutPut.collectAsList();
+            System.out.println("finished");
+
+        } catch (Exception e) {
+            log.error("exception caught : ", e);
+            throw e;
+        }
+    }
+
+
+    private int getFormatVersion(HashMap<String, SnapshotInfo> snapshotInfo) {
+
+        List<Integer> collect = snapshotInfo.values().stream().map(k -> k.getFormatVersion()).
+                distinct().collect(Collectors.toList());
+        if (collect.size() > 1) {
+            String join = org.apache.commons.lang3.StringUtils.join(collect.toArray(), "");
+            throw new RuntimeException(String.format("Multiple FormatVersion found : %s ", join));
+        }
+        log.info("detected format version : (", collect.get(0));
+        return collect.get(0);
+    }
+
+    public Pair<List<String>, List<String>> getMetadataFileNamesUsingS3Listing(Set<String> manifestPaths) {
+        Set<String> metadataPaths = new HashSet<>();
+        Set<String> manifestListPaths = new HashSet<>();
+        //Set<String> manifestPaths = new HashSet<>();
         try {
             FileSystem fileSystem = FileSystem.get(new URI(sourceBasePath), conf);
             RemoteIterator<LocatedFileStatus> iterator = fileSystem.listFiles(new Path(sourceBasePath +
                     "/" + DEFAULT_METADATA_DIR_NAME), false);
-            Set<String> metadataPaths = new HashSet<>();
-            Set<String> manifestListPaths = new HashSet<>();
-            Set<String> manifestPaths = new HashSet<>();
             while (iterator.hasNext()) {
                 LocatedFileStatus fileStatus = iterator.next();
                 Path path = fileStatus.getPath();
@@ -144,17 +321,37 @@ public class MetadataUpdater {
                     manifestPaths.add(path.toString());
                 }
             }
-            sourcePrefixToReplace = getSourcePrefixToReplace(metadataPaths.toArray(new String[0]));
-            log.info("sourcePrefixToReplace: {} will be replaced with: {}", sourcePrefixToReplace, targetPrefixPath);
-            updateMetadataJson(metadataPaths.toArray(new String[0]));
-            updateManifestList(manifestListPaths.toArray(new String[0]));
-            updateManifestFiles(manifestPaths.toArray(new String[0]));
+        } catch (Exception e) {
 
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
         }
+        return Pair.of(Arrays.asList(metadataPaths.toArray(new String[0])),
+                Arrays.asList(manifestListPaths.toArray(new String[0])));
+    }
+
+
+    public Pair<List<String>, List<String>> getMetadataFileNames(HiveCatalog hiveCatalog, TableIdentifier
+            tableIdentifier) {
+
+        TableOperations tableOperations = hiveCatalog.newTableOps(tableIdentifier);
+        TableMetadata tableMetadata = tableOperations.refresh();
+
+        //get metadata.json files
+        List metadataJsonList = new ArrayList<String>();
+        //active snapshot at index 0
+        metadataJsonList.add(tableMetadata.metadataFileLocation());
+
+        List<TableMetadata.MetadataLogEntry> metadataLogEntries = tableMetadata.previousFiles();
+        metadataLogEntries.forEach(e -> {
+            metadataJsonList.add(e.file());
+        });
+
+        //get snapshots list
+        List<String> snapshotsList = new ArrayList<>();
+        List<Snapshot> snapshots = tableMetadata.snapshots();
+        snapshots.forEach(e -> {
+            snapshotsList.add(e.manifestListLocation());
+        });
+        return Pair.of(metadataJsonList, snapshotsList);
     }
 
     private String getSourcePrefixToReplace(String[] jsonPaths) {
@@ -188,16 +385,16 @@ public class MetadataUpdater {
 
     private String getOutputDir() {
 
-        String path  = writeToOrigMetadataDir ?
-            String.format("%s/metadata/",targetPrefixPath) :
+        String path = writeToOrigMetadataDir ?
+                String.format("%s/metadata/", targetPrefixPath) :
                 String.format("%s/metadata_%s/", targetPrefixPath, targetEnvName);
         return path;
     }
 
     private String getFinalMetadataTargetPath() {
 
-        String path  = writeToOrigMetadataDir ?
-                String.format("%s/metadata/",targetPrefixPath) :
+        String path = writeToOrigMetadataDir ?
+                String.format("%s/metadata/", targetPrefixPath) :
                 String.format("%s/metadata_%s/", targetPrefixPath, targetEnvName);
         return path;
 
@@ -205,10 +402,11 @@ public class MetadataUpdater {
 
     private String getFinalMetadataSourcePath() {
 
-        String path = String.format("%s/metadata/",targetPrefixPath) ;
+        String path = String.format("%s/metadata/", targetPrefixPath);
         return path;
 
     }
+
     private void updateMetadataJson(String[] jsonPaths) {
 
         for (String jsonPath : jsonPaths) {
@@ -303,7 +501,7 @@ public class MetadataUpdater {
         }
     }
 
-    String fileName(String path) {
+    public static String fileName(String path) {
         String filename = path;
         int lastIndex = path.lastIndexOf(File.separator);
         if (lastIndex != -1) {
@@ -312,7 +510,7 @@ public class MetadataUpdater {
         return filename;
     }
 
-    String newPath(String path, String sourcePrefix, String targetPrefix) {
+    public static String newPath(String path, String sourcePrefix, String targetPrefix) {
         return path.replaceFirst(sourcePrefix, targetPrefix);
     }
 

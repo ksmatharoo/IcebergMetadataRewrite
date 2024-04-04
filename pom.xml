@@ -17,6 +17,7 @@
    <!-- <scala.compat.version>2.12</scala.compat.version>-->
    <!-- <spec2.version>4.2.0</spec2.version>-->
     <lombok.version>1.18.26</lombok.version>
+    <iceberg.version>1.2.1</iceberg.version>
   </properties>
 
 <!--
@@ -74,7 +75,7 @@
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-spark-runtime-3.2_2.12</artifactId>
-      <version>1.1.0</version>
+      <version>${iceberg.version}</version>
     </dependency>
 
     <dependency>
